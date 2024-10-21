@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Vehicle Classifier</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            flex-direction: column;
+        }
+        #loading {
+            display: none;
+        }
+        #imagePreview {
+            display: none;
+            max-width: 300px;
+            max-height: 300px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <h1>Loading and Training the Model, Please Wait...</h1>
+    </div>
+    <div id="content" style="display: none;">
+        <h1>Upload an Image</h1>
+        <input type="file" id="imageUpload" accept="image/png, image/jpeg">
+        <img id="imagePreview" src="#" alt="Uploaded Image Preview">
+        <button onclick="predict()">Predict</button>
+        <p id="result"></p>
+        <br>
+        <label for="modelSelection">Select Model: </label>
+        <select id="modelSelection" onchange="getSelectedModel()">
+            <option value="lm_rosen">LM Rosenblatt Perceptron</option>
+            <option value="mlp">Multi-Layer Perceptron</option>
+        </select>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            trainModel();
+        });
+
+        let selectedModel = 'lm_rosen';
+
+        function getSelectedModel() {
+            selectedModel = document.getElementById('modelSelection').value;
+        }
+
+        function trainModel() {
+            document.getElementById('loading').style.display = 'block';
+            fetch('/train_model', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            }).then(response => response.json())
+            .then(data => {
+                if (data.status === 'Model trained successfully') {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('content').style.display = 'block';
+                } else {
+                    alert('Model training failed.');
+                }
+            }).catch(err => {
+                alert('Error: ' + err.message);
+            });
+        }
+
+        function predict() {
+            const fileInput = document.getElementById('imageUpload');
+            if (fileInput.files.length === 0) {
+                document.getElementById('result').innerText = 'Please upload an image.';
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const image = event.target.result;
+
+                // Display the uploaded image
+                const imagePreview = document.getElementById('imagePreview');
+                imagePreview.src = image;
+                imagePreview.style.display = 'block';
+
+                const formData = createFormData(file);
+                formData.append('model', selectedModel);
+
+                fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('result').innerText = data.error;
+                    } else {
+                        document.getElementById('result').innerText = 'Prediction: ' + data.prediction;
+                    }
+                }).catch(err => {
+                    document.getElementById('result').innerText = 'Error: ' + err.message;
+                });
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function createFormData(file) {
+            const formData = new FormData();
+            formData.append('image', file);
+            return formData;
+        }
+    </script>
+</body>
+</html>
